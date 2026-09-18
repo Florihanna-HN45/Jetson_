@@ -1,0 +1,429 @@
+1. ABOUT JETSON NANO 
+- Các chân tín hiệu và nội dung liên quan 
+
+- Điều khiển các tín hiệu có gì khác với Raspi4
+
+
+- Setup hậu kỳ để tìm hiểu và tham khảo các khía cạnh liên quan.
+
+
+- Bài toán setup của VuDucDu
+
+
+
+=======================SETUP====================
+---------SSH
+
+ssh roboconlab2027@192.168.2.55
+pass: 0
+
+
+
+================chạy LINUX==================
+cd
+ls
+..
+
+
+
+
+
+============================about ULTRALYTICS===========================
+
+
+
+
+
+
+
+
+
+
+
+==================SuperDuu=================================
+1. agent/ workflow
+- Lựa chọn phát trieern trên laptop, deploy trên Jetson Nano qua Wifi/ Ethernet.
+- Nội dung được trình bày chi tiets trên file của SuperDuu
+
+// Lý giải lý do sử dung: "Deploy code từ laptop sang Jetson Nano qua SSH và quản lý engine TensorRT" 
+/*
+Hướng tới: dùng laptop để viết/ sửa và kiểm thử và code; Jetson dùng để chạy bằng GPU thông quan TensorRT. 
+Sử dụng ssh, gửi code và model qua đó, xây dựng và nạp TensorRT engine để chạy trên Jetson để inference nhanh hơn.
+
+
+/// các khái niệm phụ: engine, inference.
+
+Laptop
+ ├─ Viết code Python/C++
+ ├─ Huấn luyện hoặc chuyển mô hình sang ONNX
+ ├─ Git / rsync / scp
+ │
+ └── SSH ───> Jetson Nano
+              ├─ JetPack, CUDA, cuDNN
+              ├─ TensorRT
+              ├─ TensorRT engine (.engine/.plan)
+              └─ Chạy camera/video/inference
+
+| Thành phần                | Vai trò                                                             |
+| ------------------------- | ------------------------------------------------------------------- |
+| SSH                       | Điều khiển Jetson từ xa bằng terminal                               |
+| SCP/rsync                 | Sao chép code, model và dữ liệu                                     |
+| ONNX                      | Định dạng trung gian của mô hình                                    |
+| TensorRT                  | Tối ưu mô hình để chạy trên GPU NVIDIA                              |
+| Engine .engine hoặc .plan | Mô hình đã được biên dịch/tối ưu, dùng để inference                 |
+| JetPack                   | Bộ phần mềm nền cho Jetson, gồm Jetson Linux, CUDA, cuDNN, TensorRT |
+
+
+
+/?/ Lý giải lý do sử dụng onnx và khác biệt so với các đuôi file thường dùng là .pt và .tflite và các cấu hình đã từng sử dụng trên Raspi4
+
+- Cấu hình ban đầu: 
+
+nên giao tiếp qua git (đã dùng với raspi)
+Laptop: sửa code → git commit → git push
+Jetson: git pull → chạy test → chạy inference
+
+
+CẤU TRÚC DỰ ÁN:
+my_project/
+├── models/
+│   ├── model.onnx
+│   └── model_jetson.engine
+├── src/
+│   ├── preprocess.py
+│   ├── inference.py
+│   └── postprocess.py
+├── data/
+├── results/
+├── configs/
+│   └── config.yaml
+├── requirements.txt
+├── build_engine.sh
+└── README.md
+
+=== TensorRT engine 
+quy trình: 
+PyTorch/TensorFlow model
+          ↓
+       ONNX
+          ↓
+ TensorRT builder
+          ↓
+  TensorRT engine
+          ↓
+      Inference
+
+engine = file model + CUDA + các chiến lược tính toán (...
+FP32, FP16 hoặc INT8.
+
+Kích thước input.
+
+Tactic tối ưu.
+
+Layer fusion.
+
+Cách cấp phát bộ nhớ.
+
+Plugin cho một số toán tử đặc biệt
+...)
+
+engine chạy nhanh hơn dùng pytorch và ONNX Runtime trên Jetson.
+
+NOTE ** thường không thể đem nguyên file sang Jetson Nano để chạy. Bạn nên gửi model.onnx sang Jetson rồi build lại:
+----------------------
+Laptop:
+model.pt → model.onnx
+
+Jetson Nano:
+model.onnx → model.engine
+-------------------------
+
+
+============================3. tạo Engine===========================
+Nếu Jetson đã có TensorRT và trtexec:
+
+bash
+/usr/src/tensorrt/bin/trtexec \
+  --onnx=models/model.onnx \
+  --saveEngine=models/model_fp16.engine \
+  --fp16
+Kiểm tra engine:
+
+bash
+/usr/src/tensorrt/bin/trtexec \
+  --loadEngine=models/model_fp16.engine
+Chỉ định kích thước input nếu mô hình dynamic shape:
+
+bash
+/usr/src/tensorrt/bin/trtexec \
+  --onnx=models/model.onnx \
+  --saveEngine=models/model_fp16.engine \
+  --fp16 \
+  --minShapes=images:1x3x320x320 \
+  --optShapes=images:1x3x640x640 \
+  --maxShapes=images:1x3x640x640
+Tên images phải đúng với tên input của file ONNX. Có thể xem thông tin bằng:
+
+bash
+trtexec --onnx=models/model.onnx --verbose
+Tên đường dẫn trtexec có thể khác tùy JetPack:
+
+bash
+which trtexec
+find /usr -name trtexec 2>/dev/null
+
+
+
+
+==============Điểm khác biệt giữa FP16 và INT8=====
+FP32
+Dễ tương thích.
+
+Chính xác thường tốt.
+
+Chậm và tốn bộ nhớ hơn.
+
+FP16
+Thường là lựa chọn đầu tiên trên Jetson.
+
+Nhanh hơn FP32.
+
+Ít ảnh hưởng đến độ chính xác trong nhiều mô hình.
+
+Lệnh:
+
+bash
+trtexec \
+  --onnx=model.onnx \
+  --saveEngine=model_fp16.engine \
+  --fp16
+INT8
+Có thể nhanh và nhẹ hơn FP16.
+
+Cần calibration dataset.
+
+Có nguy cơ giảm độ chính xác nếu calibration kém.
+
+Không nên bật INT8 ngay khi bạn chưa có baseline FP32/FP16. Hãy làm theo thứ tự:
+
+text
+FP32 chạy đúng
+→ FP16 chạy đúng
+→ INT8 nếu cần tối ưu thêm
+
+
+
+
+
+
+
+
+
+-===============inference : thế nào là 1 chương trình inference===
+
+Kiến trúc 5 bước: 
+Đọc ảnh/camera
+   ↓
+Resize, normalize, đổi BGR/RGB
+   ↓
+Đưa tensor lên GPU
+   ↓
+Chạy TensorRT engine
+   ↓
+Decode output và hiển thị kết quả
+
+
+Lỗi thường gặp: điều phải chú ý và liên hệ liên quan: 
+**Mô hình cần RGB nhưng OpenCV đọc BGR.
+
+Giá trị ảnh cần chia cho 255 nhưng code không chia.
+
+Kích thước cần 640×640 nhưng truyền sai.
+
+Tensor cần dạng NCHW nhưng lại truyền NHWC.
+
+Output cần sigmoid/softmax hoặc decode bounding box nhưng bị bỏ qua.
+
+Vì vậy, cần kiểm tra input/output của ONNX và engine trước khi triển khai.*****
+
+
+Không nên đặt tên chung chung như model.engine. Hãy ghi rõ:
+
+text
+yolov8n_jetson-nano_jp4.6_trt8.2_fp16_640.engine
+Hoặc đơn giản hơn:
+
+text
+model/
+├── model.onnx
+├── model_fp16.engine
+├── metadata.json
+└── README.md
+metadata.json:
+
+json
+{
+  "model": "model.onnx",
+  "device": "Jetson Nano",
+  "precision": "FP16",
+  "input_size": [640, 640],
+  "jetpack": "4.x",
+  "tensorrt": "8.x",
+  "created_at": "2026-09-18",
+  "git_commit": "abc123"
+}
+Khi ứng dụng khởi động:
+
+Kiểm tra engine có tồn tại không.
+
+Nếu không có, build từ ONNX.
+
+Nếu engine không load được, báo lỗi rõ ràng.
+
+Không tự động ghi đè engine đang chạy.
+
+Lưu engine mới với tên tạm rồi đổi tên sau khi build thành công.
+
+Ví dụ:
+
+text
+model.engine.tmp
+→ build thành công
+→ model.engine
+11. Dùng script triển khai
+Tạo deploy.sh trên laptop:
+
+bash
+#!/usr/bin/env bash
+
+set -e
+
+TARGET="jetson@192.168.1.50"
+REMOTE_DIR="/home/jetson/my_project"
+
+rsync -avz --progress \
+  --exclude ".git" \
+  --exclude ".venv" \
+  --exclude "__pycache__" \
+  --exclude "data" \
+  ./ "$TARGET:$REMOTE_DIR/"
+
+ssh "$TARGET" "
+  cd $REMOTE_DIR &&
+  chmod +x build_engine.sh &&
+  ./build_engine.sh &&
+  python3 src/inference.py
+"
+Tách script build engine trên Jetson:
+
+bash
+#!/usr/bin/env bash
+
+set -e
+
+ENGINE="models/model_fp16.engine"
+ONNX="models/model.onnx"
+
+if [ ! -f "$ENGINE" ]; then
+  /usr/src/tensorrt/bin/trtexec \
+    --onnx="$ONNX" \
+    --saveEngine="$ENGINE" \
+    --fp16
+fi
+Sau đó chạy từ laptop:
+
+bash
+bash deploy.sh
+
+
+
+
+
+==== GIỮ CHƯƠNG TRÌNH NGAY SAU KHI ĐÓNG SSH =======
+- Nếu chạy trực tiếp: python3 src/inference.py
+Nếu chạy trực tiếp:
+
+bash
+python3 src/inference.py
+thì chương trình có thể dừng khi phiên SSH kết thúc.
+
+Dùng tmux:
+
+bash
+sudo apt install tmux
+tmux new -s vision
+python3 src/inference.py
+Tách phiên bằng:
+
+text
+Ctrl+B, rồi nhấn D
+Kết nối lại:
+
+bash
+tmux attach -t vision
+Khi triển khai ổn định, dùng systemd:
+
+text
+[Unit]
+Description=Vision TensorRT Service
+After=network.target
+
+[Service]
+User=jetson
+WorkingDirectory=/home/jetson/my_project
+ExecStart=/usr/bin/python3 /home/jetson/my_project/src/inference.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+Lưu tại:
+
+text
+/etc/systemd/system/vision.service
+Kích hoạt:
+
+bash
+sudo systemctl daemon-reload
+sudo systemctl enable vision
+sudo systemctl start vision
+Xem log:
+
+bash
+journalctl -u vision -f
+
+
+
+(lý giải sau) tại sao phải trải qua quá nhiều quá trình xử lý như thế điều gì khó khăn và gây khó khắn....
+
+
+
+
+
+=========================ERROR=======================================
+14. Lỗi thường gặp
+Lỗi	Nguyên nhân có thể	Cách xử lý
+Permission denied khi SSH	Sai user, mật khẩu hoặc SSH chưa bật	Kiểm tra user, IP, sudo systemctl status ssh
+No route to host	Laptop và Jetson khác mạng	Kiểm tra IP, Wi-Fi/Ethernet, ping
+Engine không deserialize	Sai TensorRT, GPU hoặc nền tảng	Build lại engine trên Jetson
+Unsupported operator	ONNX có toán tử chưa được TensorRT hỗ trợ	Simplify ONNX, dùng plugin hoặc đổi export
+Out of memory	Mô hình/input quá lớn	Giảm input, dùng FP16, giảm batch
+FPS thấp	CPU tiền xử lý/hậu xử lý là nút thắt	Đo từng giai đoạn, tối ưu copy CPU-GPU
+Kết quả sai	Sai RGB/BGR, shape hoặc normalize	So sánh từng bước với pipeline gốc
+Chạy được nhưng chậm	Engine build ở chế độ không phù hợp	Build lại trên Jetson, thử FP16 và benchmark
+Quy trình khuyến nghị
+text
+1. Chạy mô hình gốc trên laptop để có kết quả tham chiếu.
+2. Export mô hình sang ONNX.
+3. SSH vào Jetson và kiểm tra JetPack/CUDA/TensorRT.
+4. Gửi code và ONNX bằng Git, scp hoặc rsync.
+5. Build engine trực tiếp trên Jetson Nano.
+6. Chạy inference trên một ảnh cố định.
+7. So sánh output với laptop.
+8. Benchmark FPS, latency, RAM và nhiệt độ.
+9. Đóng gói bằng systemd hoặc tmux.
+10. Ghi lại phiên bản môi trường và engine.
+Điểm cần nhớ: SSH chỉ là phương thức đưa code và điều khiển Jetson; 
+TensorRT engine là sản phẩm biên dịch phụ thuộc mạnh vào môi trường chạy. 
+Với Jetson Nano, hãy xem ONNX là artefact trung gian có thể chuyển qua lại, còn .engine nên được xây dựng 
+và kiểm thử ngay trên Jetson.

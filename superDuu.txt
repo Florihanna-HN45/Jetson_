@@ -1,0 +1,72 @@
+SuperDuu:
+cấu trúc file: 
+agents: workflow: kiến trúc cài hệ thống và ssh 
+
+vscode: settings.json
+chỉ cập nhật extension trên vscode rằng sửa dụng Ros2 và các khía cạnh liên quan .
+
+
+core: 
+- lý giải __pycache__ : file lưu bytecode đã biên dịch (chạy chương trình thì sẽ sinh ra...) Python tự tạo... nếu cấu hình lại và chạy lại thì xóa đi cx không sao?
+tính chất: lưu giá trị: nếu không có sửa đổi mọi thứ sẽ chạy nhanh hơn mà không phải biên dịch từ đầu đó chính là ý nghĩa.
+5. Khi nào nên xóa __pycache__?
+Bạn có thể xóa khi:
+
+Gặp lỗi kỳ lạ, nghi ngờ do cache cũ (ví dụ sửa code nhưng chạy vẫn như cũ).
+
+Đổi phiên bản Python và muốn đảm bảo không dùng bytecode cũ.
+
+Dọn dẹp trước khi đóng gói, deploy.
+
+Xóa an toàn:
+
+bash
+# Trong thư mục dự án
+find . -type d -name __pycache__ -exec rm -rf {} +
+# hoặc
+find . -name "*.pyc" -delete
+Python sẽ tự tạo lại __pycache__ khi cần.
+
+6. __pycache__ trong các tình huống cụ thể
+a) Chạy script bình thường
+bash
+python3 main.py
+Python tạo __pycache__ trong cùng thư mục với main.py và các module được import.
+
+b) Chạy module bằng -m
+bash
+python3 -m package.module
+__pycache__ sẽ xuất hiện trong các thư mục có file .py được import.
+
+c) Dùng virtualenv / venv
+__pycache__ vẫn được tạo trong thư mục code của bạn, không phải trong venv.
+
+venv thường đã được thêm vào .gitignore riêng.
+
+d) Deploy lên server / Docker
+Bạn có thể:
+
+Không gửi __pycache__ (server tự tạo lại).
+
+Hoặc tạo trước trên môi trường build để tăng tốc khởi động.
+
+Trong Docker, nhiều người vẫn bỏ qua __pycache__ vì:
+
+Image thường được build từ source sạch.
+
+Container thường chạy ít lần, lợi ích cache không lớn so với việc giữ image gọn.
+
+
+
+===================================CORE===================================
+| Nhóm           | File có vẻ liên quan                                       | Vai trò dự kiến                            |
+| -------------- | ---------------------------------------------------------- | ------------------------------------------ |
+| Camera/kết nối | camera.py, gst_camera.py, connection.py                    | Đọc camera, GStreamer, kết nối thiết bị    |
+| Xử lý GPU      | cuda_preprocess.py, gpu_preprocess.py                      | Resize, đổi màu, chuẩn hóa trên GPU        |
+| TensorRT       | trt_engine.py, trt_engine_v2.py, convert_model.py          | Chuyển model, nạp engine, chạy inference   |
+| Luồng xử lý    | vision.py, vision_v2.py, async_display.py, udp_streamer.py | Điều phối pipeline, hiển thị, truyền video |
+| Xử lý kết quả  | label_smoother.py, utils.py                                | Làm mượt nhãn, hàm hỗ trợ                  |
+| Cấu hình       | config_manager.py                                          | Đường dẫn engine, tham số camera           |
+| Package Python | __init__.py, __pycache__/                                  | Khai báo package và cache bytecode         |
+
+

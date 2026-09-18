@@ -1,0 +1,11 @@
+=== HỌC DEV PYTHON====
+không phải là VIẾT LẠI CODE (X)
+(1) Chạy chương trình theo đúng quy trình.
+
+(2) Biết input và output mong đợi.
+
+(3) Nhận ra khi kết quả sai.
+
+(4) Ghi lại lỗi đủ rõ để người khác sửa hoặc tự sửa sau.
+
+
