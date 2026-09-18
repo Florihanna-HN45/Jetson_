@@ -1,0 +1,21 @@
+====== SOURCE CODE======
+ABOUT 2 FILE: 
+1. system_manager.py
+ 
+
+mid_x = frame_w/2.0 
+=> xác định biến dùng tạo và xác định vị trí 
+chủ yếu tính toán cơ bản và frame...
+
+
+
+hàm state:  tính 2 giá trị cx, cy: 
+append(....)
+
+
+1 threads phát hiện box in 
+1 threads phát hiện vũ khí (speard)
+
+
+
+
