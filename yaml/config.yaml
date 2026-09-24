@@ -1,0 +1,17 @@
+system:
+  name: "RobotVision"
+  version: 2.0
+  debug: true
+
+camera: 
+  device_id: 0
+  resolution: [1920, 1080]   #short list: 
+  fps: 30
+
+model:
+  path: "weigh/yolov8.engine"
+  conf_threshold: 0.5
+  classes:   #list dạng gạch đầu dòng
+    - person
+    - camera
+    - bicycle

@@ -1,0 +1,23 @@
+system:
+  initial_state: 1
+  load_mode: 2       # CHỈ nạp model SpearHead (V1)
+  force_square: true
+  headless: false    # BẬT cửa sổ hiển thị OpenCV GUI lên màn hình
+  udp_stream: false  # TẮT stream UDP để tiết kiệm CPU/GPU
+  test_image: false  # Chuyển thành true nếu muốn test ảnh tĩnh
+  test_image_path: "KFS_Standard/datasets/user_test/img_test_user1.jpg"
+
+hardware:
+  camera:
+    device_id: 0
+    width: 640
+    height: 480
+
+v1_model:
+  name: "SpearHead"
+  yolo_engine: "models/yolo_sp.engine"
+  device: "GPU"
+  input_size: 512
+  conf_threshold: 0.65
+  nms_threshold: 0.6
+  target_name: "Target"
